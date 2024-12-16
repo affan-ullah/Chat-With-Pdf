@@ -1,0 +1,37 @@
+# Ignore Python bytecode files in the Backend folder
+Backend/__pycache__/
+
+# Ignore virtual environment for the backend
+Backend/rag_env/
+
+# Ignore uploaded files and vector store for the backend
+Backend/uploaded_files/
+Backend/vector_db/
+Backend/data/
+Backend/pdfs/
+
+# Ignore FAISS index and metadata
+Backend/vector_db.index
+Backend/vector_db.index.pkl
+
+# Ignore environment variables
+*.env
+
+# Ignore logs or any other temporary files
+*.log
+
+# Ignore node_modules (frontend dependencies)
+Frontend/node_modules/
+
+# Ignore frontend build files
+Frontend/build/
+
+# Ignore package-lock files if you don’t want to commit them
+Frontend/package-lock.json
+
+# Ignore frontend production dependencies
+Frontend/dist/
+
+# Ignore any IDE-specific files (e.g., VSCode, Sublime Text, etc.)
+.vscode/
+.idea/

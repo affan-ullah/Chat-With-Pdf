@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF's Queries</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h1>Tell me your queries</h1>
+        
+        <!-- File Upload Form -->
+        <form id="upload-form" onsubmit="handleFileUpload(event)">
+            <div class="mb-3">
+                <label for="file-input" class="form-label">Upload PDF(s) or Image(s)</label>
+                <input type="file" id="file-input" name="files" class="form-control" multiple required>
+            </div>
+            <button type="submit" class="btn btn-primary">Upload Files</button>
+        </form>
+
+        <!-- Query Section -->
+        <div class="mt-4">
+            <h3>Ask a Question</h3>
+            <textarea id="query-input" class="form-control" rows="3" placeholder="Ask a question about the uploaded files"></textarea>
+            <button class="btn btn-secondary mt-2" onclick="handleQuery()">Submit Query</button>
+        </div>
+
+        <!-- Response Display -->
+        <div id="response" class="mt-4"></div>
+    </div>
+
+    <script>
+        // Handle file upload to the backend
+        async function handleFileUpload(event) {
+            event.preventDefault();
+
+            // Get the file input and create FormData to send files
+            const fileInput = document.getElementById('file-input');
+            const formData = new FormData();
+
+            const files = fileInput.files;
+            if (files.length === 0) {
+                alert('Please select a file');
+                return;
+            }
+
+            // Append each file to the form data for backend processing
+            Array.from(files).forEach(file => {
+                formData.append('files', file);  // Append each file to the form data
+            });
+
+            try {
+                // Send the files to the backend for processing
+                const response = await fetch('http://127.0.0.1:5000/ingest', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                    alert('Files uploaded successfully');
+                }
+            } catch (error) {
+                alert('Error uploading files: ' + error.message);
+            }
+        }
+
+        // Handle the query submission
+        async function handleQuery() {
+            const query = document.getElementById('query-input').value;
+            if (!query) {
+                alert('Please enter a query.');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://127.0.0.1:5000/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    document.getElementById('response').innerText = 'Error: ' + data.error;
+                } else {
+                    document.getElementById('response').innerText = 'Response: ' + data.response;
+                }
+            } catch (error) {
+                document.getElementById('response').innerText = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+
+</html>
