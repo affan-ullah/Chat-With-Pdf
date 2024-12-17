@@ -8,7 +8,7 @@ class Config:
     VECTOR_DB_PATH = os.path.join(os.getcwd(), 'vector_db.index')
 
     # Cohere API key (for generating responses via Cohere API)
-    COHERE_API_KEY = '<API Key>'  # replace <API Key> with actual api key.
+    COHERE_API_KEY = '<API Key>' # Replace <API Key> with actual key
 
     # Max file size for uploads (in bytes, 50MB in this case)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB

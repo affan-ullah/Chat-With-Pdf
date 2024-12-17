@@ -1,5 +1,6 @@
 # Ignore Python bytecode files in the Backend folder
 Backend/__pycache__/
+Backend/src/__pycache__/
 
 # Ignore virtual environment for the backend
 Backend/rag_env/

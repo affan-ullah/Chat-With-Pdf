@@ -42,27 +42,27 @@ def ingest_files():
 
             # Process PDF files for text extraction
             if file.filename.lower().endswith('.pdf'):
+                # Extract text and tables from PDF
                 pdf_chunks = PDFProcessor.extract_text(save_path)
                 all_chunks.extend(pdf_chunks)
 
-                # Extract tables from PDF
-                tables = extract_tables_from_pdf(save_path)
-                for table in tables:
-                    all_chunks.append({"text": table, "page": 1})
-
                 # Extract images from the PDF and use OCR for text
-                image_text = extract_text_from_pdf_images(save_path)
+                image_text = PDFProcessor.extract_text_from_pdf_images(save_path)
                 if image_text:
-                    all_chunks.append({"text": image_text, "page": 1})
+                    all_chunks.append({"text": image_text, "source": save_path})
 
             # Handle images (OCR text extraction)
             elif file.filename.lower().endswith(('.png', '.jpg', '.jpeg')): 
-                image_text = extract_text_from_image(save_path)
-                all_chunks.append({"text": image_text, "page": 1})
+                image_text = PDFProcessor.extract_text_from_image(save_path)
+                all_chunks.append({"text": image_text or "", "source": save_path})
 
         # Proceed with embeddings if there are extracted chunks
         if all_chunks:
-            texts = [chunk['text'] for chunk in all_chunks]
+            # Filter out any chunks that may contain None values
+            texts = [chunk['text'] for chunk in all_chunks if chunk.get('text')]
+            if not texts:
+                return jsonify({'error': 'No valid text extracted from files'}), 400
+
             embeddings = embedding_service.create_embeddings(texts)
             index = embedding_service.create_faiss_index(embeddings)
             vector_store.save_index(index, embeddings, all_chunks)
@@ -92,7 +92,7 @@ def query_index():
         D, I = index.search(query_embedding, k=5)
 
         # Retrieve the top results
-        results = [metadata[i] for i in I[0]]
+        results = [metadata[i] for i in I[0] if i < len(metadata)]
 
         # Pass the retrieved chunks and query to the LLM to generate a response
         response = generate_llm_response(query, results)
@@ -117,15 +117,13 @@ def compare_fields():
 
         comparison_results = {}
         for field in fields:
-            # Use the field name as a query to find relevant chunks
             query_embedding = embedding_service.create_embeddings([field])
             query_embedding = np.array(query_embedding, dtype='float32')
 
             # Perform similarity search
             D, I = index.search(query_embedding, k=5)
-            results = [metadata[i] for i in I[0]]
+            results = [metadata[i] for i in I[0] if i < len(metadata)]
 
-            # Store the results for the current field
             comparison_results[field] = results
 
         # Aggregate the results for comparison
@@ -140,36 +138,9 @@ def compare_fields():
         print(f"Error: {str(e)}")  # Log error for debugging
         return jsonify({'error': str(e)}), 500
 
-def extract_text_from_image(image_path):
-    # Extract text from an image using OCR (Tesseract)
-    image = Image.open(image_path)
-    text = pytesseract.image_to_string(image)
-    return text
-
-def extract_text_from_pdf_images(pdf_path):
-    # Extract images from the PDF and use OCR on each page
-    images = convert_from_path(pdf_path)  # Convert each page of the PDF to an image
-    image_texts = []
-    for page_number, image in enumerate(images):
-        image_text = pytesseract.image_to_string(image)
-        if image_text.strip():  # If text was extracted
-            image_texts.append(f"Page {page_number + 1}: {image_text.strip()}")
-    return "\n".join(image_texts)  # Combine all extracted text from images
-
-def extract_tables_from_pdf(pdf_path):
-    # Extract tables from PDF using pdfplumber
-    extracted_tables = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            tables = page.extract_tables()
-            for table in tables:
-                # Convert table to Markdown-like format
-                extracted_tables.append("\n".join([" | ".join(row) for row in table]))
-    return extracted_tables
-
 def generate_llm_response(query, results):
     # Prepare the context from the retrieved chunks
-    context = "\n".join([result['text'] for result in results])
+    context = "\n".join([result.get('text', '') for result in results if result.get('text')])
 
     # Construct the prompt with the context and the query
     prompt = f"""
@@ -180,11 +151,10 @@ def generate_llm_response(query, results):
     Please answer the following question based on the above context:
     {query}
     """
-
     # Call the Cohere API to generate a response with the correct model
     try:
         response = co.generate(
-            model='command-r-plus',  # Correct model ID
+            model='command-r-plus',
             prompt=prompt,
             max_tokens=500,
             temperature=0.2
@@ -200,22 +170,21 @@ def aggregate_comparison_results(comparison_results):
         for result in results:
             aggregated_data.append({
                 "Field": field,
-                "Chunk": result['text'],  # Add relevant chunk text
-                "Source": result.get('source', 'Unknown')  # Add source metadata if available
+                "Chunk": result.get('text', ''),
+                "Source": result.get('source', 'Unknown')
             })
     return aggregated_data
 
 def generate_structured_response(aggregated_data):
     """Generate a structured response in tabular or bullet-point format."""
-    # Example: Generate a tabular response using markdown
     structured_response = "### Comparison Results:\n\n"
     structured_response += "| Field           | Chunk                         | Source         |\n"
     structured_response += "|-----------------|-------------------------------|----------------|\n"
     for entry in aggregated_data:
-        field = entry["Field"]
-        chunk = entry["Chunk"]
-        source = entry["Source"]
-        structured_response += f"| {field} | {chunk[:50]}... | {source} |\n"  # Limit chunk text for readability
+        field = entry.get("Field", "Unknown")
+        chunk = entry.get("Chunk", "No Data")
+        source = entry.get("Source", "Unknown")
+        structured_response += f"| {field} | {chunk[:50]}... | {source} |\n"
     return structured_response
 
 if __name__ == "__main__":
